@@ -11,7 +11,6 @@ import (
 func GetStudents(c *gin.Context) {
 	var students []models.Student
 
-	// Получаем параметры limit и grade из query
 	limitParam := c.Query("limit")
 	gradeParam := c.Query("grade")
 
@@ -43,7 +42,24 @@ func CreateStudent(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	config.DB.Create(&student)
+
+	// Применяем студентов к учителям
+	for i := range student.Teachers {
+		// Это создаст/обновит учителей и присоединит их к студенту
+		var teacher models.Teacher
+		if err := config.DB.First(&teacher, student.Teachers[i].ID).Error; err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Teacher not found"})
+			return
+		}
+		student.Teachers[i] = teacher
+	}
+
+	// Создаем студента с учителями
+	if err := config.DB.Create(&student).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
 	c.JSON(http.StatusCreated, student)
 }
 
@@ -59,15 +75,48 @@ func UpdateStudent(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	config.DB.Save(&student)
+
+	// Применяем студентов к учителям
+	for i := range student.Teachers {
+		var teacher models.Teacher
+		if err := config.DB.First(&teacher, student.Teachers[i].ID).Error; err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Teacher not found"})
+			return
+		}
+		student.Teachers[i] = teacher
+	}
+
+	// Обновляем студента с учителями
+	if err := config.DB.Save(&student).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
 	c.JSON(http.StatusOK, student)
 }
 
-func DeleteStudent(c *gin.Context) {
-	id := c.Param("id")
-	if err := config.DB.Delete(&models.Student{}, id).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete student"})
+func DeleteTeacherFromStudent(c *gin.Context) {
+	studentID := c.Param("student_id")
+	teacherID := c.Param("teacher_id")
+
+	var student models.Student
+	var teacher models.Teacher
+
+	if err := config.DB.First(&student, studentID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Student not found"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "Student deleted"})
+
+	if err := config.DB.First(&teacher, teacherID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Teacher not found"})
+		return
+	}
+
+	// Удаляем связь
+	if err := config.DB.Model(&student).Association("Teachers").Delete(&teacher); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove teacher"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Teacher removed from student"})
 }

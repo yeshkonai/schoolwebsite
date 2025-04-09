@@ -9,5 +9,6 @@ func StudentRoutes(r *gin.Engine) {
 	r.GET("/students", controllers.GetStudents)
 	r.POST("/students", controllers.CreateStudent)
 	r.PUT("/students/:id", controllers.UpdateStudent)
-	r.DELETE("/students/:id", controllers.DeleteStudent)
+	r.DELETE("/students/:student_id/teachers/:teacher_id", controllers.DeleteTeacherFromStudent)
+
 }

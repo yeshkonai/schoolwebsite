@@ -10,10 +10,11 @@ import (
 
 func main() {
 	db := config.ConnectDB()
-	db.AutoMigrate(&models.Student{})
+	db.AutoMigrate(&models.Student{}, &models.Teacher{})
 
 	r := gin.Default()
 	routes.StudentRoutes(r)
-
-	r.Run() // default on :8080
+	routes.RegisterTeacherRoutes(r)
+	
+	r.Run()
 }
